@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "language": "English",
+    "intlLocale": "en-GB",
+    "dir": "ltr"
+  },
+  "title": "Course Feedback",
+  "heading": "Backend Development — Course Feedback",
+  "dateLabel": "Today's date:",
+  "instructions": "Please answer each of the five questions below in a few sentences. There are no right or wrong answers: honest, specific feedback helps improve the course for future students.",
+  "questions": [
+    "Which topic in this course did you find most challenging, and why?",
+    "Describe one concept you understood only after the practical assignments. What made it click?",
+    "How has your approach to designing databases or APIs changed since the start of the trimester?",
+    "What would you improve about how this course was taught or assessed?",
+    "How do you plan to apply what you learned in this course going forward?"
+  ],
+  "answerPlaceholder": "Type your answer here…",
+  "submit": "Submit feedback",
+  "languageLabel": "Language:",
+  "thankYouTitle": "Thank you!",
+  "thankYouMessage": "Your feedback has been received.",
+  "backLink": "Back to the form",
+  "errorRequired": "Please answer all five questions before submitting."
+}

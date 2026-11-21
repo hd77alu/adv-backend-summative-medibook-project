@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "language": "Français",
+    "intlLocale": "fr-FR",
+    "dir": "ltr"
+  },
+  "title": "Évaluation du cours",
+  "heading": "Développement backend — Évaluation du cours",
+  "dateLabel": "Date du jour :",
+  "instructions": "Veuillez répondre à chacune des cinq questions ci-dessous en quelques phrases. Il n'y a pas de bonne ou de mauvaise réponse : des retours honnêtes et précis aident à améliorer le cours pour les futurs étudiants.",
+  "questions": [
+    "Quel sujet de ce cours avez-vous trouvé le plus difficile, et pourquoi ?",
+    "Décrivez un concept que vous n'avez compris qu'après les travaux pratiques. Qu'est-ce qui vous a permis de le comprendre ?",
+    "Comment votre façon de concevoir des bases de données ou des API a-t-elle évolué depuis le début du trimestre ?",
+    "Qu'amélioreriez-vous dans la manière dont ce cours a été enseigné ou évalué ?",
+    "Comment comptez-vous appliquer ce que vous avez appris dans ce cours à l'avenir ?"
+  ],
+  "answerPlaceholder": "Saisissez votre réponse ici…",
+  "submit": "Envoyer l'évaluation",
+  "languageLabel": "Langue :",
+  "thankYouTitle": "Merci !",
+  "thankYouMessage": "Votre évaluation a bien été reçue.",
+  "backLink": "Retour au formulaire",
+  "errorRequired": "Veuillez répondre aux cinq questions avant d'envoyer."
+}
