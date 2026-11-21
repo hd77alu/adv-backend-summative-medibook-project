@@ -3,6 +3,11 @@
 MediBook is a backend for a community clinic. Patients book 30-minute slots with doctors between 09:00 and 17:00. Each doctor sees at most 12 patients a day, and the administrator gets revenue and utilization reports. When a slot is full, patients can join a Redis waitlist. A separate worker process books them in automatically when someone cancels.
 
 **Stack:** Node.js · Express 5 · MySQL 8 (`mysql2`, parameterized queries, no ORM) · Redis (`ioredis`) · Jest
+
+## Demo Video
+
+- You can access the demo video from this [link.]()
+
 ---
 
 ## Contents
@@ -20,6 +25,7 @@ MediBook is a backend for a community clinic. Patients book 30-minute slots with
 ## Project structure
 
 ```
+├── assets/                   # Test screenshot and demo video
 ├── database/
 │   ├── schema.sql            # Database schema
 │   ├── seed.sql              # Sample data
