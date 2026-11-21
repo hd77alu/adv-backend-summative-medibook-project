@@ -3,6 +3,7 @@ const appointmentService = require('../services/appointmentService');
 const { validateBooking } = require('../validators');
 const { notFound } = require('../utils/errors');
 const { audit } = require('../utils/auditLogger');
+const { enqueueConfirmation, enqueuePromotion } = require('../queue/producer');
 const { requireId, assertValid } = require('./helpers');
 
 /** POST /api/appointments — book a slot. */
@@ -21,6 +22,9 @@ async function book(req, res) {
     appt_datetime: appointment.appt_datetime,
     amount_paid: appointment.amount_paid,
   });
+
+  // Part E.2: confirmation SMS/email job (never throws; the booking is already committed).
+  enqueueConfirmation(appointment);
 
   res.status(201).location(`/api/appointments/${appointment.id}`).json({ data: appointment });
 }
@@ -53,7 +57,9 @@ async function cancel(req, res) {
     notice_hours: refund.noticeHours,
   });
 
-  // Part E hook: notify the waitlist that this slot is free (added with the queue).
+  // Part E.1: the slot is free — the worker promotes the first eligible
+  // waitlisted patient. Never throws; the cancellation is already committed.
+  enqueuePromotion(appointment);
 
   res.json({
     message: `Appointment ${id} cancelled. Refund: ${refund.amount.toFixed(2)} (${refund.percentage}% for ${refund.noticeHours} hours' notice).`,

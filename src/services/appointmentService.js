@@ -38,12 +38,13 @@ async function bookAppointment({ patient_id, doctor_id, appt_datetime }, now = n
   try {
     appointmentId = await withTransaction(async (conn) => {
       const doctor = await Doctor.lockById(conn, doctor_id);
-      if (!doctor) throw notFound(`Doctor ${doctor_id} not found`);
+      if (!doctor) throw notFound(`Doctor ${doctor_id} not found`, 'DOCTOR_NOT_FOUND');
 
       const patient = await Patient.findById(patient_id, conn);
-      if (!patient) throw notFound(`Patient ${patient_id} not found`);
+      if (!patient) throw notFound(`Patient ${patient_id} not found`, 'PATIENT_NOT_FOUND');
 
-      const details = { doctor_id, appt_datetime: slot.datetime, waitlist_available: true };
+      // Part E: a 409 tells the client it can join the waitlist instead.
+      const details = { doctor_id, appt_datetime: slot.datetime, waitlist_available: true, waitlist_url: '/api/waitlist' };
 
       if (await Appointment.isSlotTaken(conn, doctor_id, slot.datetime)) {
         throw conflict(`${doctor.full_name} is already booked at ${slot.datetime}`, 'SLOT_TAKEN', details);
@@ -71,7 +72,7 @@ async function bookAppointment({ patient_id, doctor_id, appt_datetime }, now = n
     // Lost a race that slipped past the check: the unique index decided.
     if (err.code === 'ER_DUP_ENTRY') {
       throw conflict(`That slot was just taken by another booking (${slot.datetime})`, 'SLOT_TAKEN', {
-        doctor_id, appt_datetime: slot.datetime, waitlist_available: true,
+        doctor_id, appt_datetime: slot.datetime, waitlist_available: true, waitlist_url: '/api/waitlist',
       });
     }
     throw err;

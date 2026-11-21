@@ -57,6 +57,12 @@ Base URL: `http://localhost:3000/api`. Requests and responses are JSON.
 | GET | `/reports/doctors` | Every doctor's total appointments and revenue, including doctors with 0 |
 | GET | `/reports/busy-days?from=&to=` | Every (doctor, date) with more than 80% of the 12 daily slots booked. `from` and `to` are optional (`YYYY-MM-DD`) |
 
+### Waitlist: [waitlistRoutes.js](../src/routes/waitlistRoutes.js) (Part E, needs Redis)
+| Method | Path | Description |
+|---|---|---|
+| POST | `/waitlist` | Join. Body: `{ patient_id, doctor_id, appt_datetime }` → `201` with your position. Only allowed when that slot or the doctor's whole day is full. Otherwise returns `409 SLOT_AVAILABLE` |
+| GET | `/waitlist?doctor_id=&date=` | The waitlist for one doctor and date, in order |
+
 ## Design justifications (Part C)
 
 **URL design.** URLs name resources with plural nouns, and the HTTP method says what to do with them. Statistics are a read-only view of one doctor, so they sit under that doctor (`/doctors/:id/stats`). The reports cover the whole clinic, not one resource, so they have their own `/reports` group. A patient's appointments are nested under the patient (`/patients/:id/appointments`) because they are read through that relationship.
@@ -103,3 +109,59 @@ Base URL: `http://localhost:3000/api`. Requests and responses are JSON.
 - **A logging failure doesn't fail the request.** `audit()` catches every error, reports it to stderr, and resolves `false`. It never rejects. Controllers call it *after* the database commit and don't await it, so a slow or broken disk can't delay or break a booking.
 - **Concurrent writers.** Each entry is written with a single `appendFile` in append mode, so lines from the web server and (in Part E) the worker don't get mixed together.
 - **Only successful operations are logged.** The call comes after the transaction commits, so a rolled-back booking never appears in the log.
+
+## Design justifications (Part E): queues and Redis
+
+Two processes share Redis:
+
+```
+web server (npm start)                         worker (npm run worker)
+  POST /appointments ─RPUSH─▶ queue:notifications ─BLMOVE─▶ write message to audit log
+  DELETE /appointments/:id ─RPUSH─▶ queue:promotions ─BLMOVE─▶ book first eligible waitlisted patient
+  POST /waitlist ─Lua─▶ waitlist:{doctor}:{date}  ◀────────────┘
+```
+
+**Why plain Redis lists, not Bull/BullMQ.** The brief allows either. Lists keep every step visible and easy to explain. [jobQueue.js](../src/queue/jobQueue.js) implements the *reliable queue* pattern in about 50 lines:
+- `BLMOVE` takes a job off the queue and puts it into `queue:processing` in **one atomic step**. A job is therefore never only in the worker's memory, where a crash would lose it.
+- When the job succeeds, it's removed from `processing` (ack).
+- When it fails, a single `MULTI` either puts it back on the queue with `attempts + 1`, or after 3 attempts moves it to `queue:failed`, the dead-letter list.
+- When the worker starts, it moves any jobs left in `processing` back onto the queue.
+
+**Who can join the waitlist.** Only someone whose requested slot is taken, or whose doctor's day is full. If the slot is free, the API returns `409 SLOT_AVAILABLE` and tells them to book it directly. The entry records which situation applied:
+- **Day was full** (`any_slot: true`): the first slot that frees up that day is theirs.
+- **Only that slot was taken** (`any_slot: false`): only that exact slot will do, because they could have picked another free slot that day.
+
+One Redis list per (doctor, date) keeps the queue first-in, first-out. A set of patient IDs blocks joining twice, and a patient who already has a booking with that doctor that day can't join. The keys expire the day after the appointment date, so old waitlists clean themselves up.
+
+**What happens when the promoted booking fails.** The patient must never disappear from both the waitlist and the appointments table. Each entry moves through three states, and every move is a Lua script, so Redis runs it atomically ([waitlist.js](../src/queue/waitlist.js)):
+
+```
+waitlist ──claim──▶ pending ──finish──▶ removed   (booked, or patient no longer exists)
+    ▲                  │
+    └────requeue───────┘                          (booking failed → back to the FRONT)
+```
+
+1. The worker **claims** the first eligible entry. In one step it's removed from the waitlist and added to `pending`.
+2. It books the patient through the **same `bookAppointment()`** the API uses, so all the rules still apply: the lock, the cap and the unique index.
+3. What happens next depends on the outcome. The pure function `classifyPromotionFailure()` decides, and it's unit-tested:
+   - **Booked:** the entry is removed for good (**finish**). The booking is written to the audit log with `source: "waitlist"`, and a confirmation job is queued.
+   - **Slot taken or day full again (409), or slot now in the past (422):** the problem is the slot, not the patient. The patient goes back to the **front** of the waitlist and keeps their place.
+   - **Database down or an unexpected error:** the patient goes back to the front, and the job fails so it's retried later (up to 3 times, then dead-lettered and audited).
+   - **Patient deleted (404):** the entry is removed, the removal is audited, and the slot is offered to the next person in line.
+4. **If the worker crashes** while an entry is in `pending`, the entry goes back to the front of its waitlist when the worker restarts. Promotion is safe to repeat: before booking, the worker checks whether the patient already has a booking that day. So a crash just after booking but before **finish** can't book the same patient twice.
+
+**Notification jobs.** Every confirmed booking queues an `APPOINTMENT_CONFIRMATION` job. That covers both API bookings and waitlist promotions. The worker "sends" it by writing a `NOTIFICATION_SENT` line, with the message text, to the audit log. Writing that line *is* the job, so if `audit()` reports a failed write, the job fails and is retried.
+
+**If Redis is down,** a booking or cancellation has already been committed in MySQL, so it still succeeds. Only the queued job is skipped, with a warning in the server log. The web server's Redis connection is set to fail immediately rather than queue commands in memory, so requests never hang. Joining the waitlist depends on Redis and returns `503`.
+
+## Part F: unit tests
+
+`npm test` runs 10 Jest tests on pure functions. They need no MySQL and no Redis.
+
+| File | Tests |
+|---|---|
+| [tests/refund.test.js](../tests/refund.test.js) | 100% tier, **48h boundary** (exactly 48h → 50%, 48h + 1ms → 100%), 50% tier with cent rounding, **24h boundary** (exactly 24h → 50%, 24h − 1ms → 0%), 0% tier |
+| [tests/slot.test.js](../tests/slot.test.js) | first and last slots (09:00, 16:30) are accepted. Edge cases **17:00** and 08:30 are outside hours; **09:15** and 09:30:10 are off the 30-minute grid. **Malformed** dates (Feb 30, `Z` suffix, wrong format, non-strings) are rejected, and so is a time that is in the past or exactly now |
+| [tests/promotionPolicy.test.js](../tests/promotionPolicy.test.js) | which waitlisted patients can take a freed slot, and how each kind of promotion failure is handled, so the patient never silently vanishes |
+
+To check that the boundary tests really test the policy, each refund boundary was broken on purpose (`>` swapped for `>=`). The matching boundary test failed each time.

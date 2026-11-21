@@ -10,6 +10,11 @@ module.exports = {
     database: process.env.DB_NAME || 'medibook',
   },
   auditLogDir: process.env.AUDIT_LOG_DIR || 'logs',
+  redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+  worker: {
+    maxAttempts: 3,        // a job that fails this many times goes to the dead-letter list
+    blockSeconds: 5,       // BLMOVE timeout, so shutdown is noticed within 5 s
+  },
 
   // Clinic business rules (single source of truth for API + SQL params).
   clinic: {

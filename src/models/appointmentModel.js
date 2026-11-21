@@ -46,6 +46,36 @@ async function isSlotTaken(conn, doctorId, datetime) {
 }
 
 /**
+ * One-query availability snapshot for a doctor slot (used before letting a
+ * patient join the waitlist — only full slots/days are waitlistable).
+ */
+async function getSlotAvailability(doctorId, date, datetime, conn = pool) {
+  const [rows] = await conn.execute(
+    `SELECT COUNT(*) AS booked_that_day,
+            COALESCE(SUM(appt_datetime = ?), 0) AS slot_taken
+       FROM appointments
+      WHERE doctor_id = ? AND appt_date = ? AND status = 'booked'`,
+    [datetime, doctorId, date],
+  );
+  return { bookedThatDay: Number(rows[0].booked_that_day), slotTaken: Number(rows[0].slot_taken) > 0 };
+}
+
+/**
+ * The patient's active booking with this doctor on this date, if any.
+ * Used to stop double-waitlisting and to make waitlist promotion idempotent
+ * (a worker that crashed after booking won't book the same patient twice).
+ */
+async function findActiveForPatientOnDay(patientId, doctorId, date, conn = pool) {
+  const [rows] = await conn.execute(
+    `SELECT id, appt_datetime FROM appointments
+      WHERE patient_id = ? AND doctor_id = ? AND appt_date = ? AND status = 'booked'
+      LIMIT 1`,
+    [patientId, doctorId, date],
+  );
+  return rows[0] || null;
+}
+
+/**
  * Inserts a booking. If a concurrent request slipped past the checks, the
  * uq_appointments_doctor_slot index rejects it with ER_DUP_ENTRY.
  */
@@ -75,4 +105,6 @@ async function markCancelled(conn, id, cancelledAt, refundAmount) {
   return result.affectedRows === 1;
 }
 
-module.exports = { findById, lockById, countBookedOnDay, isSlotTaken, create, markCancelled };
+module.exports = {
+  findById, lockById, countBookedOnDay, isSlotTaken, getSlotAvailability, findActiveForPatientOnDay, create, markCancelled,
+};

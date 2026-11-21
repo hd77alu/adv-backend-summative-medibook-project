@@ -11,7 +11,10 @@ const fs = require('fs/promises');
 const path = require('path');
 const config = require('../config');
 
-const LOG_DIR = path.resolve(config.auditLogDir);
+// Relative paths resolve from the project root, so the web server and the
+// worker always share the same file regardless of their working directory.
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const LOG_DIR = path.resolve(PROJECT_ROOT, config.auditLogDir);
 const LOG_FILE = path.join(LOG_DIR, 'audit.log');
 
 let dirReady = null; // memoised mkdir promise
