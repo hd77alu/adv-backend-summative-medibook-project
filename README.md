@@ -6,7 +6,7 @@ MediBook is a backend for a community clinic. Patients book 30-minute slots with
 
 ## Demo Video
 
-- You can access the demo video from this [link.]()
+- You can access the demo video from this [link.](https://somup.com/cOXZr8VfBox)
 
 ---
 
@@ -17,7 +17,7 @@ MediBook is a backend for a community clinic. Patients book 30-minute slots with
 - [API overview](#api-overview)
 - [Design justifications](#design-justifications)
 - [Tests (Part F)](#tests-part-f)
-- [Feedback page, i18n (Part G)](#feedback-page-i18n-part-g)
+- [Feedback page, i18n](#feedback-page-i18n-part-g)
 - [Further documentation](#further-documentation)
 
 ---
