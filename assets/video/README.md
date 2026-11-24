@@ -1,4 +1,4 @@
 # Video Demo
 
-You can access the demo video by clicking in the image below:
-[![link](https://github.com/hd77alu/Portfolio101/blob/296e02ed55e973662bdf949b9b7b610fa792ea56/images/civicEvents-pic.png)](https://somup.com/cOXZ3hVfBDe)
+You can access the demo video by clicking the image below:
+[![link](https://github.com/hd77alu/adv-backend-summative-medibook-project/blob/0507c0b7a40e9f63bc750a9393a873fa73b70a88/assets/video/demo-video-sc.png)](https://somup.com/cOXZ3hVfBDe)
