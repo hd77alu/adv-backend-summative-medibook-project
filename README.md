@@ -90,7 +90,7 @@ In **PowerShell**, where `<` doesn't work, use `source` instead:
 mysql -u root -p -e "source database/schema.sql"
 mysql -u root -p -e "source database/seed.sql"
 ```
-If `mysql` isn't on your PATH, use the full path, e.g. `"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"`.
+If `mysql` isn't on your PATH, use the full path, e.g., `"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"`.
 
 `schema.sql` **drops and recreates** the `medibook` database, so re-running both scripts always gives you a clean demo state. Seed dates are relative to the day you load it (`CURDATE() ± n`). That keeps "upcoming", "next 7 days" and the full day (Dr. Boateng, 12/12, three days from now) meaningful whenever you run it.
 
@@ -122,7 +122,7 @@ npm run worker      # queue worker: waitlist promotions + confirmation notificat
 
 Quick check once both are running:
 ```
-GET http://localhost:3000/health                    → {"status":"ok"}
+GET http://localhost:3000/health                    → {"status": "ok"}
 GET http://localhost:3000/api/reports/doctors       → every doctor, including Dr. Darko with 0
 GET http://localhost:3000/feedback?lang=fr          → French feedback form
 ```
@@ -167,9 +167,9 @@ All errors share one shape: `{ "error": { "status", "code", "message", "details?
 
 ### API design and business rules
 
-**REST design.** URLs are plural nouns, and the HTTP method says what happens. Stats are a read-only view of one doctor (`/doctors/:id/stats`). Reports cover the whole clinic, so they get their own `/reports` group. `PUT` replaces a whole record and `PATCH` updates only the fields sent. Unknown fields are rejected with a 400, so a typo isn't silently ignored.
+**REST design.** URLs are plural nouns, and the HTTP method says what happens. Stats are a read-only view of one doctor (`/doctors/:id/stats`). Reports cover the whole clinic, so they get their own `/reports` group. `PUT` replaces a whole record, and `PATCH` updates only the fields sent. Unknown fields are rejected with a 400, so a typo isn't silently ignored.
 
-**Cancellation is `DELETE /appointments/:id`.** To the client the booking is gone. On the server it's a *soft delete*: the row stays with `status='cancelled'`, `cancelled_at` and `refund_amount`, because that is the refund history. It returns `200` with a body, not `204`, because the client needs the refund amount. A second cancel returns `409`, so no one gets a second refund.
+**Cancellation is `DELETE /appointments/:id`.** To the client, the booking is gone. On the server, it's a *soft delete*: the row stays with `status='cancelled'`, `cancelled_at` and `refund_amount`, because that is the refund history. It returns `200` with a body, not `204`, because the client needs the refund amount. A second cancel returns `409`, so no one gets a second refund.
 
 **Status codes.**
 - `400`: the input is malformed (wrong type, missing field, bad JSON).
@@ -188,7 +188,7 @@ All errors share one shape: `{ "error": { "status", "code", "message", "details?
   - **24 h to 48 h, inclusive → 50%** (exactly 48 h and exactly 24 h both give 50%)
   - **less than 24 h → 0%**
 
-  Money is rounded in integer cents.
+  Money is rounded to the nearest integer cent.
 - Cancellation and refund record succeed or fail together: one `UPDATE` sets `status`, `cancelled_at` and `refund_amount` inside a transaction that locks the row. A `CHECK` constraint makes a half-written record impossible.
 - The cancellation then queues a waitlist promotion (Part E).
 
@@ -199,8 +199,8 @@ All errors share one shape: `{ "error": { "status", "code", "message", "details?
 
 ### Audit Log (`fs` module)
 
-[src/utils/auditLogger.js](src/utils/auditLogger.js) appends one JSON line per event to `logs/audit.log`: bookings, cancellations, waitlist events and notifications.
-- **Non-blocking:** it uses `fs/promises` (`mkdir`, `appendFile`). There are no `*Sync` calls anywhere in request handling.
+[src/utils/auditLogger.js](src/utils/auditLogger.js) appends one JSON line per event to `logs/audit.log`: bookings, cancellations, waitlist events, and notifications.
+- **Non-blocking:** It uses `fs/promises` (`mkdir`, `appendFile`). There are no `*Sync` calls anywhere in request handling.
 - **Creates `logs/` on first run:** `mkdir({ recursive: true })`, run once and remembered. If it fails, it's retried on the next write.
 - **A logging failure never fails the request:** `audit()` catches every error, reports it to stderr, and resolves `false`. It never rejects. Controllers call it *after* the database commit and don't wait for it, so a broken or slow disk can't break or delay a booking. Tested by putting a file where the log folder should be: the write failed, and the call still returned normally.
 - **Only successful operations are logged:** the call comes after commit, so a rolled-back booking never appears.
@@ -227,13 +227,13 @@ waitlist ──claim──▶ pending ──finish──▶ removed   (booked, o
     └────requeue───────┘                          (booking failed → back to the FRONT)
 ```
 1. The worker moves the first eligible patient from the waitlist into `pending` in one step.
-2. It books them through the **same `bookAppointment()`** as the API, so the lock, the cap and the unique index all still apply.
+2. It books them through the **same `bookAppointment()`** as the API, so the lock, the cap, and the unique index all still apply.
 3. The outcome is decided by `classifyPromotionFailure()`, a pure function covered by a unit test:
    - **Booked:** the entry is removed, the booking is audited with `source:"waitlist"`, and a confirmation job is queued.
    - **Slot taken or day full again (409), or slot now in the past (422):** the patient goes back to the **front** and keeps their place.
    - **Database down or unexpected error:** the patient goes back to the front, and the job is retried.
    - **Patient deleted:** the entry is removed, the removal is audited, and the next patient in line gets the slot.
-4. **If the worker crashes** while a patient is in `pending`, they go back to the front of the waitlist on restart. Before booking, the worker checks whether the patient already has a booking that day, so a retry can't double-book. Tested: after a simulated crash, the patient was restored to the front and the half-done job ran exactly once.
+4. **If the worker crashes** while a patient is in `pending`, they go back to the front of the waitlist on restart. Before booking, the worker checks whether the patient already has a booking that day, so a retry can't double-book. Tested: after a simulated crash, the patient was restored to the front, and the half-done job ran exactly once.
 
 **Notifications.** Every confirmed appointment, from the API or a waitlist promotion, queues an `APPOINTMENT_CONFIRMATION` job. The worker "sends" it by writing a `NOTIFICATION_SENT` line, with the message text, to the audit log. If that write fails, the job fails and is retried.
 
@@ -244,7 +244,9 @@ waitlist ──claim──▶ pending ──finish──▶ removed   (booked, o
 ```bash
 npm test
 ```
-10 Jest unit tests on pure functions. **No MySQL or Redis needed.**
+![tests pass screenshot](https://github.com/hd77alu/adv-backend-summative-medibook-project/blob/c32046adcfa65c75e84073af7b135b6386e78b71/assets/screenshots/medibook-test-sc.png)
+
+10 Jest unit tests on pure functions.
 
 | File | Covers |
 |---|---|
@@ -260,13 +262,13 @@ To check that the boundary tests really pin down the policy, each refund boundar
 
 `GET /feedback` serves a course-feedback form with **exactly 5 essay questions**, each answered in a `<textarea>`.
 
-- **All text comes from locale files:** [locales/en.json](locales/en.json) and [locales/fr.json](locales/fr.json) hold the page title, heading, instructions, the 5 questions, the button and the messages.
+- **All text comes from locale files:** [locales/en.json](locales/en.json) and [locales/fr.json](locales/fr.json) hold the page title, heading, instructions, the 5 questions, the button, and the messages.
 - **Language selection:** `/feedback?lang=fr` shows French. The default is English. Any unsupported or malformed value (`?lang=de`, `?lang=`, `?lang=../../etc`, a repeated `lang`) **falls back to English** instead of crashing. Region tags are reduced to the language (`fr-CA` → `fr`).
-- **Localized date:** today's date is formatted with `Intl.DateTimeFormat` for the active locale, giving "Saturday, 21 November 2026" or "samedi 21 novembre 2026". Punctuation is localized too: French labels have a space before the colon ("Date du jour :").
+- **Localized date:** today's date is formatted with `Intl.DateTimeFormat` for the active locale, giving "Saturday, 21 November 2026" or "samedi 21 novembre 2026". Punctuation is localized too: French labels have a space before the colon ("Date du jour:").
 - **Loaded and validated once at startup:** a locale file with a missing key, or without exactly 5 questions, stops the server with a clear error, so a half-translated page can never be served.
 - **Safe output:** every value is HTML-escaped, including user input. Submitting writes the answers to the audit log (no extra table is allowed). An empty answer re-shows the form with a localized error (`400`) and keeps what was already typed.
 
-Adding a language takes one new file, e.g. `locales/es.json`, with the same keys. It appears in the language switcher automatically.
+Adding a language takes one new file, e.g., `locales/es.json`, with the same keys. It appears in the language switcher automatically.
 
 ---
 
